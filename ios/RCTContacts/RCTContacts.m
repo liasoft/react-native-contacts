@@ -625,14 +625,17 @@ RCT_EXPORT_METHOD(openContactForm:(NSDictionary *)contactData callback:(RCTRespo
 
     CNContactViewController *controller = [FakeCNContactViewController viewControllerForNewContact:contact];
     
-    // Dirty
-    SEL originalSelector = @selector(editCancel:);
-    SEL swizzledSelector = @selector(fakeCancel);
-    
-    Class class = [FakeCNContactViewController class];
-    Method originalMethod = class_getInstanceMethod(class, originalSelector);
-    Method swizzledMethod = class_getInstanceMethod(class, swizzledSelector);
-    method_exchangeImplementations(originalMethod, swizzledMethod);
+    // Dirty workaround to bypass an iOS 13 bug when dismissing the contact form.
+    static dispatch_once_t once;
+    dispatch_once(&once, ^ {
+        SEL originalSelector = @selector(editCancel:);
+        SEL swizzledSelector = @selector(fakeCancel);
+        
+        Class class = [FakeCNContactViewController class];
+        Method originalMethod = class_getInstanceMethod(class, originalSelector);
+        Method swizzledMethod = class_getInstanceMethod(class, swizzledSelector);
+        method_exchangeImplementations(originalMethod, swizzledMethod);
+    });
     
     controller.delegate = self;
 
