@@ -4,6 +4,25 @@
 #import <AssetsLibrary/AssetsLibrary.h>
 #import <React/RCTLog.h>
 
+#import <objc/runtime.h>
+
+///
+/// FakeCNContactViewController
+/// Implements a fake controller to hack the editCancel selector since it is broken with iOS 13 and does
+/// not allow proper cancelling if the keyboard is active.
+@interface FakeCNContactViewController: CNContactViewController
+- (void)fakeCancel;
+@end
+
+@implementation FakeCNContactViewController
+
+- (void)fakeCancel {
+    [self setEditing:NO];
+    [self dismissViewControllerAnimated:YES completion:nil];
+}
+
+@end
+
 @implementation RCTContacts {
     CNContactStore * contactStore;
 
@@ -604,13 +623,22 @@ RCT_EXPORT_METHOD(openContactForm:(NSDictionary *)contactData callback:(RCTRespo
 
     [self updateRecord:contact withData:contactData];
 
-    CNContactViewController *controller = [CNContactViewController viewControllerForNewContact:contact];
+    CNContactViewController *controller = [FakeCNContactViewController viewControllerForNewContact:contact];
     
-
+    // Dirty
+    SEL originalSelector = @selector(editCancel:);
+    SEL swizzledSelector = @selector(fakeCancel);
+    
+    Class class = [FakeCNContactViewController class];
+    Method originalMethod = class_getInstanceMethod(class, originalSelector);
+    Method swizzledMethod = class_getInstanceMethod(class, swizzledSelector);
+    method_exchangeImplementations(originalMethod, swizzledMethod);
+    
     controller.delegate = self;
 
     dispatch_async(dispatch_get_main_queue(), ^{
         UINavigationController* navigation = [[UINavigationController alloc] initWithRootViewController:controller];
+                
         UIViewController *viewController = (UIViewController*)[[[[UIApplication sharedApplication] delegate] window] rootViewController];
         while (viewController.presentedViewController)
             {
